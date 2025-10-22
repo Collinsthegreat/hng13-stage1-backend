@@ -16,8 +16,13 @@ Including another URLconf
 """
 from django.contrib import admin
 from django.urls import path, include
+from django.http import JsonResponse
+
+def home(request):
+    return JsonResponse({"message": "HNG13 Backend API running successfully."})
 
 urlpatterns = [
+    path('', home),
     path('admin/', admin.site.urls),
     path('', include('strings.urls')),  # <-- include the app routes
 ]
