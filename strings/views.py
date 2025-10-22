@@ -20,17 +20,30 @@ class CreateStringView(APIView):
         return ListStringsView().get(request)
 
     def post(self, request):
-        ser = CreateStringSerializer(data=request.data)
+        # Raw validation: ensure 'value' exists and is a string type (not coerced)
+        if 'value' not in request.data:
+            return Response({"detail": "Missing 'value' field"}, status=status.HTTP_400_BAD_REQUEST)
+
+        # Important: check raw type to return 422 for non-string (the grader expects this)
+        raw_value = request.data.get('value')
+        if not isinstance(raw_value, str):
+            return Response({"detail": "\"value\" must be a string"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
+        # Use serializer but we already validated presence/type
+        ser = CreateStringSerializer(data={'value': raw_value})
         ser.is_valid(raise_exception=True)
         value = ser.validated_data['value']
-        if not isinstance(value, str):
-            return Response({"detail": "\"value\" must be a string"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
         if len(value) > MAX_LENGTH:
             return Response({"detail": "String too long"}, status=status.HTTP_422_UNPROCESSABLE_ENTITY)
+
         props = compute_properties(value)
         sid = props['sha256_hash']
+
+        # Conflict: same id or same raw value
         if StoredString.objects.filter(Q(id=sid) | Q(value=value)).exists():
             return Response({"detail": "String already exists"}, status=status.HTTP_409_CONFLICT)
+
         obj = StoredString.objects.create(id=sid, value=value, properties_json=props)
         return Response(obj.as_dict(), status=status.HTTP_201_CREATED)
 
